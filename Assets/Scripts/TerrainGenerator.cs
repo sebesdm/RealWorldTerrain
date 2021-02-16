@@ -4,15 +4,18 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 
-public class TerrainCreator : MonoBehaviour
+public class TerrainGenerator : MonoBehaviour
 {
+    public float terrainScale = 1f;
+
+
     void Start()
     {
         Terrain terrain = GameObject.Find("Terrain").GetComponent<Terrain>();
         TerrainData terrainData = terrain.terrainData;
-        int xRes = terrainData.heightmapWidth;
-        int yRes = terrainData.heightmapHeight;
-        float[,] heights = terrainData.GetHeights(0, 0, xRes, yRes);
+        int terrainDataWidth = terrainData.heightmapWidth;
+        int terrainDataHeight = terrainData.heightmapHeight;
+        float[,] heights = terrainData.GetHeights(0, 0, terrainDataWidth, terrainDataHeight);
 
         Texture2D bitmap = LoadPNG(@"C:\Users\Moses\Desktop\heightmapper-1613486714451.png");
         Texture2D alphamap = LoadPNG(@"C:\Users\Moses\Desktop\heightmapper-alpha-1613486714451.png");
@@ -22,13 +25,13 @@ public class TerrainCreator : MonoBehaviour
 
 
 
-        for (int i = 0; i < bitmapHeight; i++)
+        for (int i = 0; i < terrainDataWidth; i++)
         {
-            for (int j = 0; j < bitmapWidth; j++)
+            for (int j = 0; j < terrainDataHeight; j++)
             {
                 Color c = bitmap.GetPixel(j, i);
 
-                heights[i, j] = c.r / 1.5f;
+                heights[i, j] = c.r * terrainScale;
             }
         }
 

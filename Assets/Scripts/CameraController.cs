@@ -20,8 +20,22 @@ public class CameraController : MonoBehaviour
     public GameObject followTransform;
 
     public GameObject player;
+    public Rigidbody playerRb;
 
-    private void Update()
+    private void Start()
+    {
+        playerRb = player.GetComponent<Rigidbody>();
+    }
+
+    void FixedUpdate()
+    {
+        float vertical = Input.GetAxisRaw("Vertical");
+        float horizontal = Input.GetAxisRaw("Horizontal");
+
+        playerRb.AddForce(camera.transform.forward * vertical, ForceMode.Impulse);
+    }
+
+    void LateUpdate()
     {
         if (Input.GetMouseButton(1))
         {
@@ -30,13 +44,6 @@ public class CameraController : MonoBehaviour
             _look.y = -mouseY;
             _look.x = mouseX;
         }
-
-
-        float vertical = Input.GetAxisRaw("Vertical");
-        float horizontal = Input.GetAxisRaw("Horizontal");
-
-        player.GetComponent<Rigidbody>().AddForce(camera.transform.forward * vertical, ForceMode.Impulse);
-
 
         #region Player Based Rotation
 
