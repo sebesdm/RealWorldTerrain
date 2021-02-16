@@ -25,6 +25,14 @@ public class TerrainGenerator : MonoBehaviour
 
 
 
+
+        
+
+
+
+
+
+
         for (int i = 0; i < terrainDataWidth; i++)
         {
             for (int j = 0; j < terrainDataHeight; j++)
@@ -37,9 +45,12 @@ public class TerrainGenerator : MonoBehaviour
 
         terrainData.SetHeights(0, 0, heights);
 
-        ApplyTexture(terrain, alphamap);
+        //ApplyTexture(terrain, alphamap);
         //ApplyTrees(terrain, alphamap);
     }
+
+
+
 
     public static Texture2D LoadPNG(string filePath)
     {
