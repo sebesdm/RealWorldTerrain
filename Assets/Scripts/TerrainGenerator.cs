@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,16 +7,56 @@ using UnityEngine;
 
 public class TerrainGenerator : MonoBehaviour
 {
+    public List<Texture2D> textures = new List<Texture2D>();
+
     public float terrainScale = 1f;
+
+    public int terrainDimensionsHeight = 6;
+    public int terrainDimensionsWidth = 9;
+
+
+    private void ConnectTerrains(Terrain baseTerrain)
+    {
+        Terrain[][] terrains = new Terrain[terrainDimensionsHeight][];
+
+        for (int i = 0; i < terrainDimensionsHeight; i++)
+        {
+            terrains[i] = new Terrain[terrainDimensionsWidth];
+
+            for (int j = 0; j < terrainDimensionsWidth; j++)
+            {
+                terrains[i][j] = GameObject.Find($"Terrain_{i}_{j}").GetComponent<Terrain>();
+            }
+        }
+
+        for (int i = 0; i < terrains.Length; i++)
+        {
+            for (int j = 0; j < terrains[i].Length; j++)
+            {
+                Terrain leftNeighbor = j - 1 > 0 ? terrains[i][j - 1] : null;
+                Terrain rightNeighbor = j + 1 < terrains[i].Length ? terrains[i][j + 1] : null;
+                Terrain bottomNeighbor = i - 1 > 0 ? terrains[i - 1][j] : null;
+                Terrain topNeighbor = i + 1 < terrains.Length ? terrains[i + 1][j] : null;
+
+                terrains[i][j].SetNeighbors(leftNeighbor, topNeighbor, rightNeighbor, bottomNeighbor);
+            }
+        }
+    }
 
 
     void Start()
     {
-        Terrain terrain = GameObject.Find("Terrain").GetComponent<Terrain>();
+
+
+
+
+
+        Terrain terrain = GameObject.Find("Terrain_0_0").GetComponent<Terrain>();
+
+
         TerrainData terrainData = terrain.terrainData;
-        int terrainDataWidth = terrainData.heightmapWidth;
         int terrainDataHeight = terrainData.heightmapHeight;
-        float[,] heights = terrainData.GetHeights(0, 0, terrainDataWidth, terrainDataHeight);
+        int terrainDataWidth = terrainData.heightmapWidth;
 
         Texture2D bitmap = LoadPNG(@"C:\Users\Moses\Desktop\heightmapper-1613486714451.png");
         Texture2D alphamap = LoadPNG(@"C:\Users\Moses\Desktop\heightmapper-alpha-1613486714451.png");
@@ -23,33 +64,73 @@ public class TerrainGenerator : MonoBehaviour
         int bitmapHeight = bitmap.height;
         int bitmapWidth = bitmap.width;
 
+        ConnectTerrains(terrain);
+        float[][][,] heightsInstances = CreateTerrainHeightsInstances(terrainDataHeight, terrainDataWidth);
 
-
-
-        
-
-
-
-
-
-
-        for (int i = 0; i < terrainDataWidth; i++)
+        for (int i = 0; i < bitmapHeight; i++)
         {
-            for (int j = 0; j < terrainDataHeight; j++)
+            for (int j = 0; j < bitmapWidth; j++)
             {
-                Color c = bitmap.GetPixel(j, i);
+                Color c = bitmap.GetPixel(j, i); // This needs to be reversed!!
 
-                heights[i, j] = c.r * terrainScale;
+                int heightsInstanceTopIndex = i / terrainDataHeight;
+                int heightsInstanceRightIndex = j / terrainDataWidth;
+
+                int heightsY = i % terrainDataHeight;
+                int heightsX = j % terrainDataWidth;
+
+                float[,] heights = heightsInstances[heightsInstanceTopIndex][heightsInstanceRightIndex];
+                heights[heightsY, heightsX] = c.r * terrainScale;
+            }
+
+        }
+
+        for (int i = 0; i < heightsInstances.Length; i++)
+        {
+            for (int j = 0; j < heightsInstances[i].Length; j++)
+            {
+                Terrain t = StepToTerrainNeighbor(terrain, i, j);
+                t.terrainData.SetHeights(0, 0, heightsInstances[i][j]);
+                ApplyTexture(t, i * terrainDataHeight, j * terrainDataWidth, alphamap);
             }
         }
 
-        terrainData.SetHeights(0, 0, heights);
 
-        //ApplyTexture(terrain, alphamap);
         //ApplyTrees(terrain, alphamap);
     }
 
+    private float[][][,] CreateTerrainHeightsInstances(int terrainDataHeight, int terrainDataWidth)
+    {
+        float[][][,] heightsInstances = new float[terrainDimensionsHeight][][,];
+        for (int i = 0; i < heightsInstances.Length; i++)
+        {
+            float[][,] heightsInstanceRow = new float[terrainDimensionsWidth][,];
+            heightsInstances[i] = heightsInstanceRow;
 
+            for (int j = 0; j < heightsInstanceRow.Length; j++)
+            {
+                float[,] heightsInstance = new float[terrainDataHeight, terrainDataWidth];
+                heightsInstanceRow[j] = heightsInstance;
+            }
+        }
+        return heightsInstances;
+    }
+
+    private Terrain StepToTerrainNeighbor(Terrain baseTerrain, int topSteps, int rightSteps)
+    {
+        Terrain terrainToRetrieve = baseTerrain;
+
+        for (int i = 0; i < topSteps; i++)
+        {
+            terrainToRetrieve = terrainToRetrieve.topNeighbor;
+        }
+        for (int i = 0; i < rightSteps; i++)
+        {
+            terrainToRetrieve = terrainToRetrieve.rightNeighbor;
+        }
+
+        return terrainToRetrieve;
+    }
 
 
     public static Texture2D LoadPNG(string filePath)
@@ -114,7 +195,7 @@ public class TerrainGenerator : MonoBehaviour
     //    terrain.terrainData.SetTreeInstances(trees.ToArray(), true);
     //}
 
-    void ApplyTexture(Terrain terrain, Texture2D alphamap)
+    void ApplyTexture(Terrain terrain, int yOffset, int xOffset, Texture2D alphamap)
     {
         int WATER = 0;
         int LEAF_GROUND = 1;
@@ -127,9 +208,9 @@ public class TerrainGenerator : MonoBehaviour
         // Splatmap data is stored internally as a 3d array of floats, so declare a new empty array ready for your custom splatmap data:
         float[,,] splatmapData = new float[terrainData.alphamapWidth, terrainData.alphamapHeight, terrainData.alphamapLayers];
 
-        for (int y = 0; y < terrainData.alphamapHeight; y++)
+        for (int y = yOffset; y < terrainData.alphamapHeight; y++)
         {
-            for (int x = 0; x < terrainData.alphamapWidth; x++)
+            for (int x = xOffset; x < terrainData.alphamapWidth; x++)
             {
                 // Normalise x/y coordinates to range 0-1 
                 float y_01 = (float)y / (float)terrainData.alphamapHeight;
@@ -179,15 +260,6 @@ public class TerrainGenerator : MonoBehaviour
                         splatmapData[x, y, ROCKY_GROUND] = .1f;
                     }
                 }
-
-
-
-
-
-
-
-
-
 
 
 
