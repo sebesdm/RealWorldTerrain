@@ -5,32 +5,67 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 
-public class TerrainGenerator : MonoBehaviour
+public class Utility
 {
-    public List<Texture2D> textures = new List<Texture2D>();
-
-    public float terrainScale = 1f;
-
-    public int terrainDimensionsHeight = 6;
-    public int terrainDimensionsWidth = 9;
-
-
-    private void ConnectTerrains(Terrain baseTerrain)
+    public static Texture2D LoadPNG(string filePath)
     {
-        Terrain[][] terrains = new Terrain[terrainDimensionsHeight][];
 
-        for (int i = 0; i < terrainDimensionsHeight; i++)
+        Texture2D tex = null;
+        byte[] fileData;
+
+        if (File.Exists(filePath))
         {
-            terrains[i] = new Terrain[terrainDimensionsWidth];
+            fileData = File.ReadAllBytes(filePath);
+            tex = new Texture2D(2, 2);
+            tex.LoadImage(fileData); //..this will auto-resize the texture dimensions.
+        }
+        return tex;
+    }
+}
 
-            for (int j = 0; j < terrainDimensionsWidth; j++)
+public class MultiTerrainManager
+{
+    public int TerrainDimensionsHeight { get; private set; }
+    public int TerrainDimensionsWidth { get; private set; }
+    public Terrain BaseTerrain { get; private set; }
+
+    public MultiTerrainManager(int terrainDimensionsHeight, int terrainDimensionsWidth)
+    {
+        TerrainDimensionsHeight = terrainDimensionsHeight;
+        TerrainDimensionsWidth = terrainDimensionsWidth;
+
+        InitializeTerrains();
+    }
+
+    public void ForeachTerrain(Action<Terrain, Terrain, int, int> terrainAction)
+    {
+        for (int i = 0; i < terrains.Length; i++)
+        {
+            for (int j = 0; j < terrains[i].Length; j++)
             {
-                terrains[i][j] = GameObject.Find($"Terrain_{i}_{j}").GetComponent<Terrain>();
-
-                SetTerrainTextures(terrains[i][j]);
+                terrainAction(BaseTerrain, terrains[i][j], i, j);
             }
         }
+    }
 
+    private void InitializeTerrains()
+    {
+        terrains = new Terrain[TerrainDimensionsHeight][];
+        for (int i = 0; i < terrains.Length; i++)
+        {
+            terrains[i] = new Terrain[TerrainDimensionsWidth];
+            for (int j = 0; j < terrains[i].Length; j++)
+            {
+                terrains[i][j] = GameObject.Find($"Terrain_{i}_{j}").GetComponent<Terrain>();
+            }
+        }
+        BaseTerrain = terrains[0][0];
+
+        ConnectTerrainsInScene();
+    }
+
+    private void ConnectTerrainsInScene()
+    {
         for (int i = 0; i < terrains.Length; i++)
         {
             for (int j = 0; j < terrains[i].Length; j++)
@@ -45,30 +80,32 @@ public class TerrainGenerator : MonoBehaviour
         }
     }
 
+    private Terrain[][] terrains { get; set; }
+}
 
-    private void SetTerrainTextures(Terrain terrain)
+public class TerrainHeightGenerator
+{
+    public float terrainScale = 1f;
+    public TerrainHeightGenerator(MultiTerrainManager multiTerrainManager, float terrainScale)
     {
-        terrain.terrainData.terrainLayers = BaseTerrain.terrainData.terrainLayers;
-        terrain.materialTemplate = BaseTerrain.materialTemplate;
+        this.multiTerrainManager = multiTerrainManager;
+        this.terrainScale = terrainScale;
     }
 
-    private Terrain BaseTerrain;
 
-    void Start()
+    public void DoHeights()
     {
-        BaseTerrain = GameObject.Find("Terrain_0_0").GetComponent<Terrain>();
-        TerrainData terrainData = BaseTerrain.terrainData;
+        TerrainData terrainData = multiTerrainManager.BaseTerrain.terrainData;
 
         int terrainDataHeight = terrainData.heightmapHeight;
         int terrainDataWidth = terrainData.heightmapWidth;
 
-        Texture2D bitmap = LoadPNG(@"C:\Users\Moses\Desktop\heightmapper-1613486714451.png");
-        Texture2D alphamap = LoadPNG(@"C:\Users\Moses\Desktop\heightmapper-alpha-1613486714451.png");
+        Texture2D bitmap = Utility.LoadPNG(@"C:\Users\Moses\Desktop\heightmapper-1613486714451.png");
+
 
         int bitmapHeight = bitmap.height;
         int bitmapWidth = bitmap.width;
 
-        ConnectTerrains(BaseTerrain);
         float[][][,] heightsInstances = CreateTerrainHeightsInstances(terrainDataHeight, terrainDataWidth);
 
         for (int i = 0; i < bitmapHeight; i++)
@@ -93,31 +130,10 @@ public class TerrainGenerator : MonoBehaviour
         {
             for (int j = 0; j < heightsInstances[i].Length; j++)
             {
-                Terrain t = StepToTerrainNeighbor(BaseTerrain, i, j);
+                Terrain t = StepToTerrainNeighbor(multiTerrainManager.BaseTerrain, i, j);
                 t.terrainData.SetHeights(0, 0, heightsInstances[i][j]);
-                ApplyTexture(t, i * terrainDataHeight, j * terrainDataWidth, alphamap);
             }
         }
-
-
-        //ApplyTrees(terrain, alphamap);
-    }
-
-    private float[][][,] CreateTerrainHeightsInstances(int terrainDataHeight, int terrainDataWidth)
-    {
-        float[][][,] heightsInstances = new float[terrainDimensionsHeight][][,];
-        for (int i = 0; i < heightsInstances.Length; i++)
-        {
-            float[][,] heightsInstanceRow = new float[terrainDimensionsWidth][,];
-            heightsInstances[i] = heightsInstanceRow;
-
-            for (int j = 0; j < heightsInstanceRow.Length; j++)
-            {
-                float[,] heightsInstance = new float[terrainDataHeight, terrainDataWidth];
-                heightsInstanceRow[j] = heightsInstance;
-            }
-        }
-        return heightsInstances;
     }
 
     private Terrain StepToTerrainNeighbor(Terrain baseTerrain, int topSteps, int rightSteps)
@@ -136,71 +152,45 @@ public class TerrainGenerator : MonoBehaviour
         return terrainToRetrieve;
     }
 
-
-    public static Texture2D LoadPNG(string filePath)
+    private float[][][,] CreateTerrainHeightsInstances(int terrainDataHeight, int terrainDataWidth)
     {
-
-        Texture2D tex = null;
-        byte[] fileData;
-
-        if (File.Exists(filePath))
+        float[][][,] heightsInstances = new float[multiTerrainManager.TerrainDimensionsHeight][][,];
+        for (int i = 0; i < heightsInstances.Length; i++)
         {
-            fileData = File.ReadAllBytes(filePath);
-            tex = new Texture2D(2, 2);
-            tex.LoadImage(fileData); //..this will auto-resize the texture dimensions.
+            float[][,] heightsInstanceRow = new float[multiTerrainManager.TerrainDimensionsWidth][,];
+            heightsInstances[i] = heightsInstanceRow;
+
+            for (int j = 0; j < heightsInstanceRow.Length; j++)
+            {
+                float[,] heightsInstance = new float[terrainDataHeight, terrainDataWidth];
+                heightsInstanceRow[j] = heightsInstance;
+            }
         }
-        return tex;
+        return heightsInstances;
     }
 
-    //void ApplyTrees(Terrain terrain, Texture2D alphamap)
-    //{
+    private MultiTerrainManager multiTerrainManager;
+}
 
-
-
-    //    terrain.drawTreesAndFoliage = true;
-
-
-
-    //    // Get a reference to the terrain data
-    //    TerrainData terrainData = terrain.terrainData;
-
-    //    // Splatmap data is stored internally as a 3d array of floats, so declare a new empty array ready for your custom splatmap data:
-    //    float[,,] splatmapData = new float[terrainData.alphamapWidth, terrainData.alphamapHeight, terrainData.alphamapLayers];
-
-    //    List<TreeInstance> trees = new List<TreeInstance>();
-    //    for (int y = 0; y < terrainData.alphamapHeight; y++)
-    //    {
-    //        for (int x = 0; x < terrainData.alphamapWidth; x++)
-    //        {
-    //            Color c = alphamap.GetPixel(y - 1, x - 6); // Need to fecth the pixels reversed due to x, y flip for alphamaps
-
-    //            float y_01 = (float)y / (float)terrainData.alphamapHeight;
-    //            float x_01 = (float)x / (float)terrainData.alphamapWidth;
-
-    //            if (!(c.r < .18f && c.g < .18f && c.b < .18f))
-    //            {
-    //                if(y % 100 == 0 && x % 100 == 0)
-    //                {
-    //                    TreeInstance tree = new TreeInstance();
-    //                    //tree.heightScale = 1;
-    //                    //tree.widthScale = 1;
-    //                    tree.prototypeIndex = 0;
-    //                    tree.position = new Vector3(x, y, 0);
-    //                    trees.Add(tree);
-
-
-    //                }
-    //            }
-
-
-    //        }
-    //    }
-
-    //    terrain.terrainData.SetTreeInstances(trees.ToArray(), true);
-    //}
-
-    void ApplyTexture(Terrain terrain, int yOffset, int xOffset, Texture2D alphamap)
+public class TerrainTextureGenerator
+{
+    public TerrainTextureGenerator(MultiTerrainManager multiTerrainManager)
     {
+        this.multiTerrainManager = multiTerrainManager;
+    }
+    public void DoTexture()
+    {
+        alphamap = Utility.LoadPNG(@"C:\Users\Moses\Desktop\heightmapper-alpha-1613486714451.png");
+        multiTerrainManager.ForeachTerrain(SetTerrainTextures);
+        multiTerrainManager.ForeachTerrain(ApplyTexture);
+    }
+
+    private void ApplyTexture(Terrain baseTerrain, Terrain terrain, int terrainOffsetX, int terrainOffsetY)
+    {
+        int xOffset = terrainOffsetX * terrain.terrainData.heightmapHeight;
+        int yOffset = terrainOffsetY * terrain.terrainData.heightmapWidth;
+
+
         int WATER = 0;
         int LEAF_GROUND = 1;
         int GRASS = 2;
@@ -216,23 +206,7 @@ public class TerrainGenerator : MonoBehaviour
         {
             for (int x = 0; x < terrainData.alphamapWidth; x++)
             {
-                // Normalise x/y coordinates to range 0-1 
-                float y_01 = (float)y / (float)terrainData.alphamapHeight;
-                float x_01 = (float)x / (float)terrainData.alphamapWidth;
-
-                // Sample the height at this location (note GetHeight expects int coordinates corresponding to locations in the heightmap array)
-                float height = terrainData.GetHeight(Mathf.RoundToInt(y_01 * terrainData.heightmapHeight), Mathf.RoundToInt(x_01 * terrainData.heightmapWidth));
-
-                // Calculate the normal of the terrain (note this is in normalised coordinates relative to the overall terrain dimensions)
-                Vector3 normal = terrainData.GetInterpolatedNormal(y_01, x_01);
-
-                // Calculate the steepness of the terrain
-                float steepness = terrainData.GetSteepness(y_01, x_01);
-
-                // Setup an array to record the mix of texture weights at this point
-                float[] splatWeights = new float[terrainData.alphamapLayers];
-
-                Color c = alphamap.GetPixel(y - 1 + xOffset, x - 6 + yOffset); // Need to fecth the pixels reversed due to x, y flip for alphamaps
+                Color c = alphamap.GetPixel(y - 1 + yOffset, x - 6 + xOffset); // Need to fecth the pixels reversed due to x, y flip for alphamaps
 
                 if (c.r < .18f && c.g < .18f && c.b < .18f)
                 {
@@ -247,30 +221,73 @@ public class TerrainGenerator : MonoBehaviour
                     splatmapData[x, y, LEAF_GROUND] = .05f;
                     splatmapData[x, y, GRASS] = .05f;
                     splatmapData[x, y, ROCKY_GROUND] = .9f;
-
-                    //if (height > 70f)
-                    //{
-                    //    splatmapData[x, y, LEAF_GROUND] = .05f;
-                    //    splatmapData[x, y, GRASS] = .05f;
-                    //    splatmapData[x, y, ROCKY_GROUND] = .9f;
-                    //}
-                    //else if (height < 20f)
-                    //{
-                    //    splatmapData[x, y, LEAF_GROUND] = .5f;
-                    //    splatmapData[x, y, GRASS] = .5f;
-                    //    splatmapData[x, y, ROCKY_GROUND] = .0f;
-                    //}
-                    //else
-                    //{
-                    //    splatmapData[x, y, LEAF_GROUND] = .75f;
-                    //    splatmapData[x, y, GRASS] = .15f;
-                    //    splatmapData[x, y, ROCKY_GROUND] = .1f;
-                    //}
                 }
             }
         }
 
         // Finally assign the new splatmap to the terrainData:
         terrainData.SetAlphamaps(0, 0, splatmapData);
+    }
+
+    private void SetTerrainTextures(Terrain baseTerrain, Terrain terrain, int terrainIndexX, int terrainIndexY)
+    {
+        terrain.terrainData.terrainLayers = baseTerrain.terrainData.terrainLayers;
+        terrain.materialTemplate = baseTerrain.materialTemplate;
+    }
+
+    private MultiTerrainManager multiTerrainManager;
+    private Texture2D alphamap;
+}
+
+public class TerrainGenerator : MonoBehaviour
+{
+    void Start()
+    {
+        MultiTerrainManager multiTerrainManager = new MultiTerrainManager(6, 9);
+
+        //TerrainHeightGenerator heightGenerator = new TerrainHeightGenerator(multiTerrainManager, .3f);
+        //heightGenerator.DoHeights();
+
+        //TerrainTextureGenerator textureGenerator = new TerrainTextureGenerator(multiTerrainManager);
+        //textureGenerator.DoTexture();
+
+        List<TreeInstance> trees = new List<TreeInstance>();
+        for (float i = 0; i < 1; i = i + .05f)
+        {
+            for (float j = 0; j < 1; j = j + .05f)
+            {
+                float castDistance = 150;
+
+                Physics.Raycast(new Vector3(i * 1000, castDistance, j * 1000), Vector3.down, out RaycastHit hitinfo, 1000);
+                Debug.DrawRay(new Vector3(i * 1000, castDistance, j * 1000), Vector3.down, Color.red, 1000, true);
+
+                if(hitinfo.distance < 110)
+                {
+                    trees.Add(new TreeInstance() { position = new Vector3(i, castDistance, j), heightScale = .6f, prototypeIndex = 0, widthScale = .6f });
+                }
+            }
+        }
+
+
+        multiTerrainManager.ForeachTerrain((bt, t, x, y) =>
+        {
+
+
+            t.terrainData.treePrototypes = bt.terrainData.treePrototypes;
+
+
+
+
+            TerrainData terrainData = t.terrainData;
+            terrainData.SetTreeInstances(trees.ToArray(), true);
+
+        });
+
+
+
+
+
+
+
     }
 }

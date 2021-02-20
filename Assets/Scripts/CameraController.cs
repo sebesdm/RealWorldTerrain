@@ -32,7 +32,7 @@ public class CameraController : MonoBehaviour
         float vertical = Input.GetAxisRaw("Vertical");
         float horizontal = Input.GetAxisRaw("Horizontal");
 
-        playerRb.AddForce(camera.transform.forward * vertical, ForceMode.Impulse);
+        playerRb.AddForce(camera.transform.forward * vertical * Time.deltaTime * 50, ForceMode.Impulse);
     }
 
     void LateUpdate()
