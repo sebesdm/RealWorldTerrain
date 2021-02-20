@@ -26,6 +26,8 @@ public class TerrainGenerator : MonoBehaviour
             for (int j = 0; j < terrainDimensionsWidth; j++)
             {
                 terrains[i][j] = GameObject.Find($"Terrain_{i}_{j}").GetComponent<Terrain>();
+
+                SetTerrainTextures(terrains[i][j]);
             }
         }
 
@@ -44,17 +46,19 @@ public class TerrainGenerator : MonoBehaviour
     }
 
 
+    private void SetTerrainTextures(Terrain terrain)
+    {
+        terrain.terrainData.terrainLayers = BaseTerrain.terrainData.terrainLayers;
+        terrain.materialTemplate = BaseTerrain.materialTemplate;
+    }
+
+    private Terrain BaseTerrain;
+
     void Start()
     {
+        BaseTerrain = GameObject.Find("Terrain_0_0").GetComponent<Terrain>();
+        TerrainData terrainData = BaseTerrain.terrainData;
 
-
-
-
-
-        Terrain terrain = GameObject.Find("Terrain_0_0").GetComponent<Terrain>();
-
-
-        TerrainData terrainData = terrain.terrainData;
         int terrainDataHeight = terrainData.heightmapHeight;
         int terrainDataWidth = terrainData.heightmapWidth;
 
@@ -64,7 +68,7 @@ public class TerrainGenerator : MonoBehaviour
         int bitmapHeight = bitmap.height;
         int bitmapWidth = bitmap.width;
 
-        ConnectTerrains(terrain);
+        ConnectTerrains(BaseTerrain);
         float[][][,] heightsInstances = CreateTerrainHeightsInstances(terrainDataHeight, terrainDataWidth);
 
         for (int i = 0; i < bitmapHeight; i++)
@@ -89,7 +93,7 @@ public class TerrainGenerator : MonoBehaviour
         {
             for (int j = 0; j < heightsInstances[i].Length; j++)
             {
-                Terrain t = StepToTerrainNeighbor(terrain, i, j);
+                Terrain t = StepToTerrainNeighbor(BaseTerrain, i, j);
                 t.terrainData.SetHeights(0, 0, heightsInstances[i][j]);
                 ApplyTexture(t, i * terrainDataHeight, j * terrainDataWidth, alphamap);
             }
@@ -208,9 +212,9 @@ public class TerrainGenerator : MonoBehaviour
         // Splatmap data is stored internally as a 3d array of floats, so declare a new empty array ready for your custom splatmap data:
         float[,,] splatmapData = new float[terrainData.alphamapWidth, terrainData.alphamapHeight, terrainData.alphamapLayers];
 
-        for (int y = yOffset; y < terrainData.alphamapHeight; y++)
+        for (int y = 0; y < terrainData.alphamapHeight; y++)
         {
-            for (int x = xOffset; x < terrainData.alphamapWidth; x++)
+            for (int x = 0; x < terrainData.alphamapWidth; x++)
             {
                 // Normalise x/y coordinates to range 0-1 
                 float y_01 = (float)y / (float)terrainData.alphamapHeight;
@@ -228,7 +232,7 @@ public class TerrainGenerator : MonoBehaviour
                 // Setup an array to record the mix of texture weights at this point
                 float[] splatWeights = new float[terrainData.alphamapLayers];
 
-                Color c = alphamap.GetPixel(y - 1, x - 6); // Need to fecth the pixels reversed due to x, y flip for alphamaps
+                Color c = alphamap.GetPixel(y - 1 + xOffset, x - 6 + yOffset); // Need to fecth the pixels reversed due to x, y flip for alphamaps
 
                 if (c.r < .18f && c.g < .18f && c.b < .18f)
                 {
@@ -240,42 +244,29 @@ public class TerrainGenerator : MonoBehaviour
                 else
                 {
                     splatmapData[x, y, WATER] = 0;
+                    splatmapData[x, y, LEAF_GROUND] = .05f;
+                    splatmapData[x, y, GRASS] = .05f;
+                    splatmapData[x, y, ROCKY_GROUND] = .9f;
 
-                    if (height > 70f)
-                    {
-                        splatmapData[x, y, LEAF_GROUND] = .05f;
-                        splatmapData[x, y, GRASS] = .05f;
-                        splatmapData[x, y, ROCKY_GROUND] = .9f;
-                    }
-                    else if (height < 20f)
-                    {
-                        splatmapData[x, y, LEAF_GROUND] = .5f;
-                        splatmapData[x, y, GRASS] = .5f;
-                        splatmapData[x, y, ROCKY_GROUND] = .0f;
-                    }
-                    else
-                    {
-                        splatmapData[x, y, LEAF_GROUND] = .75f;
-                        splatmapData[x, y, GRASS] = .15f;
-                        splatmapData[x, y, ROCKY_GROUND] = .1f;
-                    }
+                    //if (height > 70f)
+                    //{
+                    //    splatmapData[x, y, LEAF_GROUND] = .05f;
+                    //    splatmapData[x, y, GRASS] = .05f;
+                    //    splatmapData[x, y, ROCKY_GROUND] = .9f;
+                    //}
+                    //else if (height < 20f)
+                    //{
+                    //    splatmapData[x, y, LEAF_GROUND] = .5f;
+                    //    splatmapData[x, y, GRASS] = .5f;
+                    //    splatmapData[x, y, ROCKY_GROUND] = .0f;
+                    //}
+                    //else
+                    //{
+                    //    splatmapData[x, y, LEAF_GROUND] = .75f;
+                    //    splatmapData[x, y, GRASS] = .15f;
+                    //    splatmapData[x, y, ROCKY_GROUND] = .1f;
+                    //}
                 }
-
-
-
-                //// Sum of all textures weights must add to 1, so calculate normalization factor from sum of weights
-                //float z = splatWeights.Sum();
-
-                //// Loop through each terrain texture
-                //for (int i = 0; i < terrainData.alphamapLayers; i++)
-                //{
-
-                //    // Normalize so that sum of all texture weights = 1
-                //    splatWeights[i] /= z;
-
-                //    // Assign this point to the splatmap array
-                //    splatmapData[x, y, i] = splatWeights[i];
-                //}
             }
         }
 
