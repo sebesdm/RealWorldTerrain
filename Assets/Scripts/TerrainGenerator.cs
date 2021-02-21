@@ -195,15 +195,17 @@ public class TerrainTreeGenerator
         List<TreeInstance> trees = new List<TreeInstance>();
 
 
-        for (int y = 0; y < terrainData.alphamapHeight; y = y + 15)
+        for (int y = 0; y < terrainData.alphamapHeight; y = y + 10)
         {
-            for (int x = 0; x < terrainData.alphamapWidth; x = x + 15)
+            for (int x = 0; x < terrainData.alphamapWidth; x = x + 10)
             {
                 Color c = alphamap.GetPixel(y - 1 + yOffset, x - 6 + xOffset); // Need to fecth the pixels reversed due to x, y flip for alphamaps
 
                 if (c.r > .18f && c.g > .18f && c.b > .18f)
                 {
-                    trees.Add(new TreeInstance() { position = new Vector3(y / (float)terrainData.alphamapHeight, 1000f, x / (float)terrainData.alphamapWidth), heightScale = .6f, prototypeIndex = 0, widthScale = .6f });
+                    int treePrototype = UnityEngine.Random.Range(0, 2);
+
+                    trees.Add(new TreeInstance() { position = new Vector3(y / (float)terrainData.alphamapHeight, 1000f, x / (float)terrainData.alphamapWidth), heightScale = .6f, prototypeIndex = treePrototype, widthScale = .6f });
                 }
             }
         }
