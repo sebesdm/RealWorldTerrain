@@ -172,6 +172,50 @@ public class TerrainHeightGenerator
     private MultiTerrainManager multiTerrainManager;
 }
 
+
+public class TerrainTreeGenerator
+{
+    public TerrainTreeGenerator(MultiTerrainManager multiTerrainManager)
+    {
+        this.multiTerrainManager = multiTerrainManager;
+    }
+    public void DoTrees()
+    {
+        alphamap = Utility.LoadPNG(@"C:\Users\Moses\Desktop\heightmapper-alpha-1613486714451.png");
+        multiTerrainManager.ForeachTerrain(ApplyTrees);
+    }
+
+    private void ApplyTrees(Terrain baseTerrain, Terrain terrain, int terrainOffsetX, int terrainOffsetY)
+    {
+        int xOffset = terrainOffsetX * terrain.terrainData.heightmapHeight;
+        int yOffset = terrainOffsetY * terrain.terrainData.heightmapWidth;
+
+        TerrainData terrainData = terrain.terrainData;
+
+        List<TreeInstance> trees = new List<TreeInstance>();
+
+
+        for (int y = 0; y < terrainData.alphamapHeight; y = y + 15)
+        {
+            for (int x = 0; x < terrainData.alphamapWidth; x = x + 15)
+            {
+                Color c = alphamap.GetPixel(y - 1 + yOffset, x - 6 + xOffset); // Need to fecth the pixels reversed due to x, y flip for alphamaps
+
+                if (c.r > .18f && c.g > .18f && c.b > .18f)
+                {
+                    trees.Add(new TreeInstance() { position = new Vector3(y / (float)terrainData.alphamapHeight, 1000f, x / (float)terrainData.alphamapWidth), heightScale = .6f, prototypeIndex = 0, widthScale = .6f });
+                }
+            }
+        }
+
+        terrain.terrainData.treePrototypes = baseTerrain.terrainData.treePrototypes;
+        terrain.terrainData.SetTreeInstances(trees.ToArray(), true);
+    }
+
+    private MultiTerrainManager multiTerrainManager;
+    private Texture2D alphamap;
+}
+
 public class TerrainTextureGenerator
 {
     public TerrainTextureGenerator(MultiTerrainManager multiTerrainManager)
@@ -251,43 +295,91 @@ public class TerrainGenerator : MonoBehaviour
         //TerrainTextureGenerator textureGenerator = new TerrainTextureGenerator(multiTerrainManager);
         //textureGenerator.DoTexture();
 
-        List<TreeInstance> trees = new List<TreeInstance>();
-        for (float i = 0; i < 1; i = i + .05f)
-        {
-            for (float j = 0; j < 1; j = j + .05f)
-            {
-                float castDistance = 150;
-
-                Physics.Raycast(new Vector3(i * 1000, castDistance, j * 1000), Vector3.down, out RaycastHit hitinfo, 1000);
-                Debug.DrawRay(new Vector3(i * 1000, castDistance, j * 1000), Vector3.down, Color.red, 1000, true);
-
-                if(hitinfo.distance < 110)
-                {
-                    trees.Add(new TreeInstance() { position = new Vector3(i, castDistance, j), heightScale = .6f, prototypeIndex = 0, widthScale = .6f });
-                }
-            }
-        }
-
-
-        multiTerrainManager.ForeachTerrain((bt, t, x, y) =>
-        {
-
-
-            t.terrainData.treePrototypes = bt.terrainData.treePrototypes;
 
 
 
 
-            TerrainData terrainData = t.terrainData;
-            terrainData.SetTreeInstances(trees.ToArray(), true);
-
-        });
+        TerrainTreeGenerator treeGenerator = new TerrainTreeGenerator(multiTerrainManager);
+        treeGenerator.DoTrees();
 
 
 
 
+        //List<TreeInstance> trees = new List<TreeInstance>();
+        //for (float i = 0; i < 1; i = i + .05f)
+        //{
+        //    for (float j = 0; j < 1; j = j + .05f)
+        //    {
+        //        float castDistance = 150;
+
+        //        Physics.Raycast(new Vector3(i * 1000, castDistance, j * 1000), Vector3.down, out RaycastHit hitinfo, 1000);
+        //        Debug.DrawRay(new Vector3(i * 1000, castDistance, j * 1000), Vector3.down, Color.red, 1000, true);
+
+        //        if(hitinfo.distance < 110)
+        //        {
+        //            trees.Add(new TreeInstance() { position = new Vector3(i, castDistance, j), heightScale = .6f, prototypeIndex = 0, widthScale = .6f });
+        //        }
+        //    }
+        //}
 
 
+        //multiTerrainManager.ForeachTerrain((bt, t, x, y) =>
+        //{
+
+
+        //    t.terrainData.treePrototypes = bt.terrainData.treePrototypes;
+
+
+
+
+        //    TerrainData terrainData = t.terrainData;
+        //    terrainData.SetTreeInstances(trees.ToArray(), true);
+
+        //});
 
     }
+
+    //private void ApplyTrees(Terrain baseTerrain, Terrain terrain, int terrainOffsetX, int terrainOffsetY)
+    //{
+    //    int xOffset = terrainOffsetX * terrain.terrainData.heightmapHeight;
+    //    int yOffset = terrainOffsetY * terrain.terrainData.heightmapWidth;
+
+
+    //    int WATER = 0;
+    //    int LEAF_GROUND = 1;
+    //    int GRASS = 2;
+    //    int ROCKY_GROUND = 3;
+
+    //    // Get a reference to the terrain data
+    //    TerrainData terrainData = terrain.terrainData;
+
+    //    // Splatmap data is stored internally as a 3d array of floats, so declare a new empty array ready for your custom splatmap data:
+    //    float[,,] splatmapData = new float[terrainData.alphamapWidth, terrainData.alphamapHeight, terrainData.alphamapLayers];
+
+    //    for (int y = 0; y < terrainData.alphamapHeight; y++)
+    //    {
+    //        for (int x = 0; x < terrainData.alphamapWidth; x++)
+    //        {
+    //            Color c = alphamap.GetPixel(y - 1 + yOffset, x - 6 + xOffset); // Need to fecth the pixels reversed due to x, y flip for alphamaps
+
+    //            if (c.r < .18f && c.g < .18f && c.b < .18f)
+    //            {
+    //                splatmapData[x, y, WATER] = 1;
+    //                splatmapData[x, y, LEAF_GROUND] = 0;
+    //                splatmapData[x, y, GRASS] = 0;
+    //                splatmapData[x, y, ROCKY_GROUND] = 0;
+    //            }
+    //            else
+    //            {
+    //                splatmapData[x, y, WATER] = 0;
+    //                splatmapData[x, y, LEAF_GROUND] = .05f;
+    //                splatmapData[x, y, GRASS] = .05f;
+    //                splatmapData[x, y, ROCKY_GROUND] = .9f;
+    //            }
+    //        }
+    //    }
+
+    //    // Finally assign the new splatmap to the terrainData:
+    //    terrainData.SetAlphamaps(0, 0, splatmapData);
+    //}
 }
