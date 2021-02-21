@@ -29,10 +29,11 @@ public class MultiTerrainManager
     public int TerrainDimensionsWidth { get; private set; }
     public Terrain BaseTerrain { get; private set; }
 
-    public MultiTerrainManager(int terrainDimensionsHeight, int terrainDimensionsWidth)
+    public MultiTerrainManager(int terrainDimensionsHeight, int terrainDimensionsWidth, List<(int, int)> terrainExclusions)
     {
         TerrainDimensionsHeight = terrainDimensionsHeight;
         TerrainDimensionsWidth = terrainDimensionsWidth;
+        this.terrainExclusions = terrainExclusions;
 
         InitializeTerrains();
     }
@@ -43,9 +44,26 @@ public class MultiTerrainManager
         {
             for (int j = 0; j < terrains[i].Length; j++)
             {
+                if(terrainExclusions.Any(te => te.Item1 == i && te.Item2 == j))
+                {
+                    continue; // if we explicitly exclude some terrains, don't process them in the iteration
+                }
                 terrainAction(BaseTerrain, terrains[i][j], i, j);
             }
         }
+    }
+
+    public bool IsValidTerrainIndex(int row, int column)
+    {
+        return !(row < 0 && column < 0 && row >= TerrainDimensionsHeight && column >= TerrainDimensionsWidth);
+    }
+
+    public (int, int) GetTerrainIndexFromName(string name)
+    {
+        var coords = name.Split(new char[] { '_' });
+        var row = int.Parse(coords[1]);
+        var column = int.Parse(coords[2]);
+        return (row, column);
     }
 
     private void InitializeTerrains()
@@ -81,6 +99,7 @@ public class MultiTerrainManager
     }
 
     private Terrain[][] terrains { get; set; }
+    private List<(int, int)> terrainExclusions { get; set; }
 }
 
 public class TerrainHeightGenerator
@@ -195,17 +214,24 @@ public class TerrainTreeGenerator
         List<TreeInstance> trees = new List<TreeInstance>();
 
 
-        for (int y = 0; y < terrainData.alphamapHeight; y = y + 10)
+        for (int y = 0; y < terrainData.alphamapHeight; y = y + 4)
         {
-            for (int x = 0; x < terrainData.alphamapWidth; x = x + 10)
+            for (int x = 0; x < terrainData.alphamapWidth; x = x + 4)
             {
                 Color c = alphamap.GetPixel(y - 1 + yOffset, x - 6 + xOffset); // Need to fecth the pixels reversed due to x, y flip for alphamaps
 
                 if (c.r > .18f && c.g > .18f && c.b > .18f)
                 {
-                    int treePrototype = UnityEngine.Random.Range(0, 2);
+                    int randomTreePrototype = UnityEngine.Random.Range(0, 2);
+                    float randomScale = UnityEngine.Random.Range(.7f, 1f);
 
-                    trees.Add(new TreeInstance() { position = new Vector3(y / (float)terrainData.alphamapHeight, 1000f, x / (float)terrainData.alphamapWidth), heightScale = .6f, prototypeIndex = treePrototype, widthScale = .6f });
+                    float randomXOffset = UnityEngine.Random.Range(0, .01f);
+                    float randomYOffset = UnityEngine.Random.Range(0, .01f);
+
+                    float xPos = (x / (float)terrainData.alphamapWidth) + randomXOffset;
+                    float yPos = (y / (float)terrainData.alphamapHeight) + randomYOffset;
+
+                    trees.Add(new TreeInstance() { position = new Vector3(yPos, 1000f, xPos), heightScale = randomScale, prototypeIndex = randomTreePrototype, widthScale = randomScale });
                 }
             }
         }
@@ -287,9 +313,36 @@ public class TerrainTextureGenerator
 
 public class TerrainGenerator : MonoBehaviour
 {
+    public GameObject player;
+
+    public float skyboxr = 0;
+
+
+
     void Start()
     {
-        MultiTerrainManager multiTerrainManager = new MultiTerrainManager(6, 9);
+        RenderSettings.skybox.SetFloat("_Rotation", skyboxr);
+
+        List<(int, int)> terrainExclusions = new List<(int, int)>();
+        //terrainExclusions.Add((1, 0));
+        //terrainExclusions.Add((2, 0));
+        //terrainExclusions.Add((3, 0));
+        //terrainExclusions.Add((2, 1));
+        //terrainExclusions.Add((3, 1));
+        //terrainExclusions.Add((3, 2));
+        //terrainExclusions.Add((3, 3));
+        //terrainExclusions.Add((3, 8));
+        //terrainExclusions.Add((2, 8));
+        //terrainExclusions.Add((1, 8));
+        //terrainExclusions.Add((0, 8));
+        //terrainExclusions.Add((0, 7));
+        //terrainExclusions.Add((1, 7));
+        //terrainExclusions.Add((2, 7));
+        //terrainExclusions.Add((3, 7));
+        //terrainExclusions.Add((0, 6));
+        //terrainExclusions.Add((0, 5));
+
+        MultiTerrainManager multiTerrainManager = new MultiTerrainManager(4, 9, terrainExclusions);
 
         //TerrainHeightGenerator heightGenerator = new TerrainHeightGenerator(multiTerrainManager, .3f);
         //heightGenerator.DoHeights();
@@ -297,91 +350,87 @@ public class TerrainGenerator : MonoBehaviour
         //TerrainTextureGenerator textureGenerator = new TerrainTextureGenerator(multiTerrainManager);
         //textureGenerator.DoTexture();
 
-
-
-
-
         TerrainTreeGenerator treeGenerator = new TerrainTreeGenerator(multiTerrainManager);
         treeGenerator.DoTrees();
 
-
-
-
-        //List<TreeInstance> trees = new List<TreeInstance>();
-        //for (float i = 0; i < 1; i = i + .05f)
-        //{
-        //    for (float j = 0; j < 1; j = j + .05f)
-        //    {
-        //        float castDistance = 150;
-
-        //        Physics.Raycast(new Vector3(i * 1000, castDistance, j * 1000), Vector3.down, out RaycastHit hitinfo, 1000);
-        //        Debug.DrawRay(new Vector3(i * 1000, castDistance, j * 1000), Vector3.down, Color.red, 1000, true);
-
-        //        if(hitinfo.distance < 110)
-        //        {
-        //            trees.Add(new TreeInstance() { position = new Vector3(i, castDistance, j), heightScale = .6f, prototypeIndex = 0, widthScale = .6f });
-        //        }
-        //    }
-        //}
-
-
-        //multiTerrainManager.ForeachTerrain((bt, t, x, y) =>
-        //{
-
-
-        //    t.terrainData.treePrototypes = bt.terrainData.treePrototypes;
-
-
-
-
-        //    TerrainData terrainData = t.terrainData;
-        //    terrainData.SetTreeInstances(trees.ToArray(), true);
-
-        //});
-
+        terrainDisabler = new TerrainDissabler(multiTerrainManager, player);
     }
 
-    //private void ApplyTrees(Terrain baseTerrain, Terrain terrain, int terrainOffsetX, int terrainOffsetY)
-    //{
-    //    int xOffset = terrainOffsetX * terrain.terrainData.heightmapHeight;
-    //    int yOffset = terrainOffsetY * terrain.terrainData.heightmapWidth;
+    public void Update()
+    {
+        terrainDisabler.CheckTerrains();
+    }
 
+    private TerrainDissabler terrainDisabler;
+}
 
-    //    int WATER = 0;
-    //    int LEAF_GROUND = 1;
-    //    int GRASS = 2;
-    //    int ROCKY_GROUND = 3;
+public class TerrainDissabler
+{
+    public TerrainDissabler(MultiTerrainManager terrainManager, GameObject player)
+    {
+        this.terrainManager = terrainManager;
+        this.player = player;
+    }
 
-    //    // Get a reference to the terrain data
-    //    TerrainData terrainData = terrain.terrainData;
+    public void CheckTerrains()
+    {
+        Ray ray = new Ray(player.transform.position, Vector3.down);
+        Physics.Raycast(ray, out RaycastHit hitInfo, 5000);
+        var collideObj = hitInfo.collider.gameObject;
 
-    //    // Splatmap data is stored internally as a 3d array of floats, so declare a new empty array ready for your custom splatmap data:
-    //    float[,,] splatmapData = new float[terrainData.alphamapWidth, terrainData.alphamapHeight, terrainData.alphamapLayers];
+        (int, int) index = terrainManager.GetTerrainIndexFromName(collideObj.name);
+        var row = index.Item1;
+        var column = index.Item2;
 
-    //    for (int y = 0; y < terrainData.alphamapHeight; y++)
-    //    {
-    //        for (int x = 0; x < terrainData.alphamapWidth; x++)
-    //        {
-    //            Color c = alphamap.GetPixel(y - 1 + yOffset, x - 6 + xOffset); // Need to fecth the pixels reversed due to x, y flip for alphamaps
+        List<(int, int)> terrainsToActivate = new List<(int, int)>();
+        terrainsToActivate.Add((row, column)); // Current Player Terrain
 
-    //            if (c.r < .18f && c.g < .18f && c.b < .18f)
-    //            {
-    //                splatmapData[x, y, WATER] = 1;
-    //                splatmapData[x, y, LEAF_GROUND] = 0;
-    //                splatmapData[x, y, GRASS] = 0;
-    //                splatmapData[x, y, ROCKY_GROUND] = 0;
-    //            }
-    //            else
-    //            {
-    //                splatmapData[x, y, WATER] = 0;
-    //                splatmapData[x, y, LEAF_GROUND] = .05f;
-    //                splatmapData[x, y, GRASS] = .05f;
-    //                splatmapData[x, y, ROCKY_GROUND] = .9f;
-    //            }
-    //        }
-    //    }
+        if(terrainManager.IsValidTerrainIndex(row - 1, column - 1))
+        {
+            terrainsToActivate.Add((row - 1, column - 1));
+        }
+        if (terrainManager.IsValidTerrainIndex(row, column - 1))
+        {
+            terrainsToActivate.Add((row, column - 1));
+        }
+        if (terrainManager.IsValidTerrainIndex(row + 1, column - 1))
+        {
+            terrainsToActivate.Add((row + 1, column - 1));
+        }
+        if (terrainManager.IsValidTerrainIndex(row + 1, column))
+        {
+            terrainsToActivate.Add((row + 1, column));
+        }
+        if (terrainManager.IsValidTerrainIndex(row - 1, column))
+        {
+            terrainsToActivate.Add((row - 1, column));
+        }
+        if (terrainManager.IsValidTerrainIndex(row - 1, column + 1))
+        {
+            terrainsToActivate.Add((row - 1, column + 1));
+        }
+        if (terrainManager.IsValidTerrainIndex(row, column + 1))
+        {
+            terrainsToActivate.Add((row, column + 1));
+        }
+        if (terrainManager.IsValidTerrainIndex(row + 1, column + 1))
+        {
+            terrainsToActivate.Add((row + 1, column + 1));
+        }
 
-    //    // Finally assign the new splatmap to the terrainData:
-    //    terrainData.SetAlphamaps(0, 0, splatmapData);
-    //}
+        terrainManager.ForeachTerrain((bt, t, indexX, indexY) =>
+        {
+            if (terrainsToActivate.Any(tta => tta.Item1 == indexX && tta.Item2 == indexY))
+            {
+                t.enabled = true;
+            }
+            else
+            {
+                t.enabled = false;
+            }
+        });
+    }
+
+    private MultiTerrainManager terrainManager;
+    private GameObject player;
 }
