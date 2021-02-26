@@ -32,9 +32,9 @@ public class TreeManager
         }
     }
 
-    public void SetTrees(Vector3 center)
+    public void SetTrees(Vector3 center, bool cullNearTiles)
     {
-        terrain.SetTreeInstances(trees, center);
+        terrain.SetTreeInstances(trees, center, cullNearTiles);
     }
 
     List<TreeInstance> trees = new List<TreeInstance>();

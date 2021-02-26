@@ -27,8 +27,7 @@ public class TerrainGenerator : MonoBehaviour
         multiTerrain.SetSplatmapData(splatmap);
 
         treeManager = new TreeManager(multiTerrain, 50000);
-        //treeManager.SetTrees(player.transform.position);
-        treeManager.SetTrees(player.transform.position);
+        treeManager.SetTrees(player.transform.position, false);
 
         StartCoroutine("RedoTrees");
     }
@@ -40,9 +39,8 @@ public class TerrainGenerator : MonoBehaviour
     {
         while (true)
         {
-            yield return new WaitForSeconds(2f);
-            //treeManager.SetTrees(player.transform.position);
-            treeManager.SetTrees(player.transform.position);
+            yield return new WaitForSeconds(1f);
+            treeManager.SetTrees(player.transform.position, true);
         }
     }
 

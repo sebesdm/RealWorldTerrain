@@ -52,19 +52,69 @@ public class MultiTerrain
         ConnectTerrainsInScene();
     }
 
-    public void SetTreeInstances(IEnumerable<TreeInstance> treeInstances, Vector3 center)
+    public void SetTreeInstances(IEnumerable<TreeInstance> treeInstances, Vector3 center, bool cullNearTiles = true)
     {
         // Tree instances on a tile have a min of 0, max of 1.  Normalized.
+        IEnumerable<TerrainTileIndex> nearTerrainTiles = Enumerable.Empty<TerrainTileIndex>();
+        if (cullNearTiles)
+        {
+            nearTerrainTiles = GetNearTerrainTiles(center);
+        }
         var treePositions = treeInstances.Select(ti => NormalizeTreeInstancePosition(ti, center)).Where(_ => !_.Item3).ToList();
 
         ForeachTerrainTile((terrainTile, terrainTileIndex) =>
         {
+            if(nearTerrainTiles.Any(ntt => ntt.Row == terrainTileIndex.Row && ntt.Column == terrainTileIndex.Column))
+            {
+                return;
+            }
+
             var treePositionsForTile = treePositions.Where(tp => tp.Item2.Row == terrainTileIndex.Row && tp.Item2.Column == terrainTileIndex.Column).ToList();
             var treeInstancesForTile = treePositionsForTile.Select(tpft => tpft.Item1).ToList();
-
-
+            
             terrainTiles[terrainTileIndex.Row][terrainTileIndex.Column].terrainData.SetTreeInstances(treeInstancesForTile.ToArray(), true);
         });
+    }
+
+    private IEnumerable<TerrainTileIndex> GetNearTerrainTiles(Vector3 center)
+    {
+        int maxRowIndex = terrainTiles.Length - 1;
+        int maxColumnIndex = terrainTiles[0].Length - 1;
+
+        float dimension = terrainTiles[0][0].terrainData.size.x;
+        int terrainTileRowIndex = (int)(center.z / dimension);
+        int terrainTileColumnIndex = (int)(center.x / dimension);
+
+        List<TerrainTileIndex> nearTerrainTiles = new List<TerrainTileIndex>();
+
+        nearTerrainTiles.Add(new TerrainTileIndex() { Row = terrainTileRowIndex, Column = terrainTileColumnIndex });
+        for(int i = 6; i >= 0; i--)
+        {
+            for (int j = 6 - i; j >= 0; j--)
+            {
+                if (terrainTileRowIndex + i <= maxRowIndex && terrainTileColumnIndex + j <= maxColumnIndex)
+                {
+                    nearTerrainTiles.Add(new TerrainTileIndex() { Row = terrainTileRowIndex + i, Column = terrainTileColumnIndex + j });
+                }
+
+                if (terrainTileRowIndex - i >= 0 && terrainTileColumnIndex - j >= 0)
+                {
+                    nearTerrainTiles.Add(new TerrainTileIndex() { Row = terrainTileRowIndex - i, Column = terrainTileColumnIndex - j });
+                }
+
+                if (terrainTileRowIndex + i <= maxRowIndex && terrainTileColumnIndex - j >= 0)
+                {
+                    nearTerrainTiles.Add(new TerrainTileIndex() { Row = terrainTileRowIndex + i, Column = terrainTileColumnIndex - j });
+                }
+
+                if (terrainTileRowIndex - i >= 0 && terrainTileColumnIndex + j <= maxColumnIndex)
+                {
+                    nearTerrainTiles.Add(new TerrainTileIndex() { Row = terrainTileRowIndex - i, Column = terrainTileColumnIndex + j });
+                }
+            }
+        }
+
+        return nearTerrainTiles;
     }
 
     private (TreeInstance, TerrainTileIndex, bool) NormalizeTreeInstancePosition(TreeInstance treeInstance, Vector3 center)
